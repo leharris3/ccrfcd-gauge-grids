@@ -162,7 +162,7 @@ class CCRFCDGriddedProducts:
 
         def _latlon_to_idx(lat, lon) -> Tuple[int, int]:
             """
-            Return (i, j) indices on the 0.01° grid.
+            Return (i, j) indices on grid.
             """
             i = int((lat - self._LAT_MIN) / self._DLAT)
             j = int((lon - self._LON_MIN) / self._DLON)
