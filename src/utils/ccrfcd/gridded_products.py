@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class Location:
@@ -49,7 +49,7 @@ class CCRFCDGriddedProducts:
     _LON_MAX = -113.792819
 
     # 0.1° ~ 10 km?
-    _DLAT = _DLON = 0.04
+    _DLAT = _DLON = 0.045
 
     # # clark county
     # _LAT_MIN = 36.0
@@ -218,6 +218,16 @@ class CCRFCDGriddedProducts:
 
         return all_gauge_qpe
 
+    def _fetch_ccrfcd_qpe_xhr(self, start_time, delta: int) -> np.ndarray:
+        """
+        Returns
+        ---
+        - An [N, M] array containing cumlative precipitation values (inch)
+        """
+        end_time  = start_time + timedelta(hours=delta)
+        pts       = self._fetch_all_gauge_qpe(start_time, end_time)
+        grid_mean = self._grid_all_gauge_qpe(pts)
+        return grid_mean
 
     def fetch_ccrfcd_qpe_1hr(self, start_time: datetime) -> np.ndarray: 
         """
@@ -225,7 +235,7 @@ class CCRFCDGriddedProducts:
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        pass
+        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=1)
 
     def fetch_ccrfcd_qpe_3hr(self, start_time: datetime) -> np.ndarray: 
         """
@@ -233,13 +243,43 @@ class CCRFCDGriddedProducts:
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        pass
+        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=3)
 
+    def fetch_ccrfcd_qpe_6hr(self, start_time: datetime) -> np.ndarray: 
+        """
+        Returns
+        ---
+        - An [N, M] array containing cumlative precipitation values (inch)
+        """
+        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=6)
+
+    def fetch_ccrfcd_qpe_12hr(self, start_time: datetime) -> np.ndarray: 
+        """
+        Returns
+        ---
+        - An [N, M] array containing cumlative precipitation values (inch)
+        """
+        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=12)
+
+    def fetch_ccrfcd_qpe_24hr(self, start_time: datetime) -> np.ndarray: 
+        """
+        Returns
+        ---
+        - An [N, M] array containing cumlative precipitation values (inch)
+        """
+        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=24)
+
+    def fetch_ccrfcd_qpe_48hr(self, start_time: datetime) -> np.ndarray: 
+        """
+        Returns
+        ---
+        - An [N, M] array containing cumlative precipitation values (inch)
+        """
+        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=48)
 
 if __name__ == "__main__": 
 
     t1 = datetime(year=2024, month=7, day=14, hour=6)
     t2 = datetime(year=2024, month=7, day=14, hour=12)
     obj = CCRFCDGriddedProducts()
-    gauge_qpes = obj._fetch_all_gauge_qpe(t1, t2)
-    obj._grid_all_gauge_qpe(gauge_qpes)
+    gauge_qpes = obj.fetch_ccrfcd_qpe_1hr(t1)
