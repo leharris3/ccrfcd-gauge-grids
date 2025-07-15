@@ -1,7 +1,11 @@
+import os
+import xarray as xr
+
 from typing import List
 from datetime import datetime
 from bisect import bisect_left, bisect_right
 
+from src.utils.mrms.files import ZippedGrib2File, Grib2File
 from src.utils.mrms.mrms import MRMSDomain, MRMSPath
 from src.utils.mrms.mrms import MRMSAWSS3Client
 from src.utils.mrms.products import MRMSProductsEnum
@@ -52,8 +56,7 @@ class MRMSQPEClient:
             raise ValueError(f"Unrecognized mode '{mode}'. "
                              "Choose 'nearest', 'first', or 'next'.")
 
-
-    def _fetch_radar_only_qpe_x(self, start_time: datetime, mode="nearest"): 
+    def _fetch_radar_only_qpe_x(self, start_time: datetime, product: str, mode="nearest") -> xr.Dataset : 
         """
         Fetch MRMS ``RadarOnly_QPE`` suite of products. 
 
@@ -73,18 +76,44 @@ class MRMSQPEClient:
         yyyymmdd = start_time.strftime("%Y%m%d")
         basepath = MRMSPath(
             domain   = MRMSDomain.CONUS, 
-            product  = MRMSProductsEnum.RadarOnly_QPE_01H,
+            product  = product,
             yyyymmdd = yyyymmdd
             )
         
-        file_paths = self.mrms_client.ls(str(basepath))
+        file_paths   = self.mrms_client.ls(str(basepath))
         nearest_path = self._get_closest_file(file_paths, start_time)
-        breakpoint()
+        
+        # TODO: del grib2 files after donwnload
+        mp = MRMSPath.from_str(nearest_path)
+        fp = self.mrms_client.download(str(mp), to="")
+        
+        zipped_gf = ZippedGrib2File(fp)
+        gf        = zipped_gf.unzip(to_dir="")
+        xa        = gf.to_xarray()
 
-    def fetch_radar_only_qpe_15m(self, start_time: datetime, mode="nearest"): pass
+        return xa
+
+    def fetch_radar_only_qpe_15m(self, start_time: datetime, mode="nearest"):
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_15M, mode=mode)
+    
+    def fetch_radar_only_qpe_1hr(self, start_time: datetime, mode="nearest"):
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_01H, mode=mode)
+
+    def fetch_radar_only_qpe_3hr(self, start_time: datetime, mode="nearest"):
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_03H, mode=mode)
+    
+    def fetch_radar_only_qpe_6hr(self, start_time: datetime, mode="nearest"):
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_06H, mode=mode)
+    
+    def fetch_radar_only_qpe_12hr(self, start_time: datetime, mode="nearest"):
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_12H, mode=mode)
+    
+    def fetch_radar_only_qpe_24hr(self, start_time: datetime, mode="nearest"):
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_24H, mode=mode)
 
 
 if __name__ == "__main__":
     client = MRMSQPEClient()
     date = datetime.now()
-    client._fetch_radar_only_qpe_x(date)
+    ar = client.fetch_radar_only_qpe_6hr(date)
+    breakpoint()

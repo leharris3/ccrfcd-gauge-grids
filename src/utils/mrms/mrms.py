@@ -174,7 +174,7 @@ class MRMSAWSS3Client:
     def ls(self, path: str) -> List[str]:
         return self.s3_file_system.ls(path)
 
-    def download(self, path: str, to: str, recursive=False) -> List[str]:
+    def download(self, path: str, to: str, recursive=False) -> List[str] | str:
         """
         Returns
         ---
@@ -222,6 +222,9 @@ class MRMSAWSS3Client:
                 f"Download failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
             )
 
+        if len(local_paths) == 1:
+            return local_paths[0]
+        
         return local_paths
 
     def submit_bulk_download(self, paths: List[str], tos: List[str]): ...
