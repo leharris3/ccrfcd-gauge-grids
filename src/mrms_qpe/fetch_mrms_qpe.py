@@ -2,7 +2,7 @@ import os
 import xarray as xr
 
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 from bisect import bisect_left, bisect_right
 
 from src.utils.mrms.files import ZippedGrib2File, Grib2File
@@ -56,8 +56,9 @@ class MRMSQPEClient:
             raise ValueError(f"Unrecognized mode '{mode}'. "
                              "Choose 'nearest', 'first', or 'next'.")
 
-    def _fetch_radar_only_qpe_x(self, start_time: datetime, product: str, mode="nearest") -> xr.Dataset : 
+    def _fetch_radar_only_qpe_x(self, start_time: datetime, product: str, mode="nearest", time_zone="UTC") -> xr.Dataset : 
         """
+        **Timezone**: ``UTC``
         Fetch MRMS ``RadarOnly_QPE`` suite of products. 
 
         Args
@@ -72,6 +73,10 @@ class MRMSQPEClient:
         Returns
         ---
         """
+
+        # HACK: PDT -> UTC
+        if time_zone == "PDT":
+            start_time += timedelta(hours=7)
 
         yyyymmdd = start_time.strftime("%Y%m%d")
         basepath = MRMSPath(
@@ -93,23 +98,47 @@ class MRMSQPEClient:
 
         return xa
 
-    def fetch_radar_only_qpe_15m(self, start_time: datetime, mode="nearest"):
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_15M, mode=mode)
+    def fetch_radar_only_qpe_15m(self, end_time: datetime, mode="nearest", time_zone="UTC"):
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-0:15``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_15M, mode=mode, time_zone=time_zone)
     
-    def fetch_radar_only_qpe_1hr(self, start_time: datetime, mode="nearest"):
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_01H, mode=mode)
+    def fetch_radar_only_qpe_1hr(self, end_time: datetime, mode="nearest", time_zone="UTC"):
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-1:00``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_01H, mode=mode, time_zone=time_zone)
 
-    def fetch_radar_only_qpe_3hr(self, start_time: datetime, mode="nearest"):
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_03H, mode=mode)
+    def fetch_radar_only_qpe_3hr(self, end_time: datetime, mode="nearest", time_zone="UTC"):
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-3:00``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_03H, mode=mode, time_zone=time_zone)
     
-    def fetch_radar_only_qpe_6hr(self, start_time: datetime, mode="nearest"):
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_06H, mode=mode)
+    def fetch_radar_only_qpe_6hr(self, end_time: datetime, mode="nearest", time_zone="UTC"):
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-6:00``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_06H, mode=mode, time_zone=time_zone)
     
-    def fetch_radar_only_qpe_12hr(self, start_time: datetime, mode="nearest"):
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_12H, mode=mode)
+    def fetch_radar_only_qpe_12hr(self, end_time: datetime, mode="nearest", time_zone="UTC"):
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-12:00``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_12H, mode=mode, time_zone=time_zone)
     
-    def fetch_radar_only_qpe_24hr(self, start_time: datetime, mode="nearest"):
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_24H, mode=mode)
+    def fetch_radar_only_qpe_24hr(self, start_time: datetime, mode="nearest", time_zone="UTC"):
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-24:00``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_24H, mode=mode, time_zone=time_zone)
 
 
 if __name__ == "__main__":

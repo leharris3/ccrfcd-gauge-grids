@@ -20,6 +20,7 @@ queries:
 """
 
 import logging
+from logging.config import DictConfigurator
 import numpy as np
 import pandas as pd
 
@@ -49,7 +50,8 @@ class CCRFCDGriddedProducts:
     _LON_MAX = -113.792819
 
     # 0.1° ~ 10 km?
-    _DLAT = _DLON = 0.045
+    # _DLAT = _DLON = 0.045
+    _DLAT = _DLON = 0.02
 
     # # clark county
     # _LAT_MIN = 36.0
@@ -192,13 +194,21 @@ class CCRFCDGriddedProducts:
 
         return grid_mean
 
-    def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime) -> List[Tuple[Location, float]]:
+    def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime) -> List[Dict]:
         """
         Gather all cummulative precipitation values (in.) between bounds of [start_time, end_time]; inclusive.
-        # TODO: make less slow...
+
+        Returns
+        ---
+        ```python
+        [{
+            "station_id": int,
+            "location": Location,
+            "qpe": float
+        }]
+        ```
         """
         
-        # order doesn't matter, we should parallelize
         all_gauge_qpe = []
 
         for _id in tqdm(self.valid_station_ids, total=len(self.valid_station_ids)):
@@ -214,68 +224,77 @@ class CCRFCDGriddedProducts:
             # TODO: clarify this >>
             if res[0] == None or res[1] == None: continue
             
-            all_gauge_qpe.append(res)
+            all_gauge_qpe.append({
+                "station_id": _id,
+                "lat": res[0].lat,
+                "lon": res[0].lon + 360,
+                "qpe": res[1],
+            })
 
         return all_gauge_qpe
 
-    def _fetch_ccrfcd_qpe_xhr(self, start_time, delta: int) -> np.ndarray:
+    def _fetch_ccrfcd_qpe_xhr(self, end_time: datetime, delta_hr: int = 0, delta_min: int = 0) -> List[Dict]:
         """
+        - TODO: skip gridding; return raw lat/lon gauage's w/ ids.
+        
         Returns
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        end_time  = start_time + timedelta(hours=delta)
-        pts       = self._fetch_all_gauge_qpe(start_time, end_time)
-        grid_mean = self._grid_all_gauge_qpe(pts)
-        return grid_mean
+        start_time = end_time - timedelta(hours=delta_hr, minutes=delta_min)
+        pts        = self._fetch_all_gauge_qpe(start_time, end_time)
+        return pts
 
-    def fetch_ccrfcd_qpe_1hr(self, start_time: datetime) -> np.ndarray: 
+    def fetch_ccrfcd_qpe_1hr(self, end_time: datetime) -> List[Dict]: 
         """
         Returns
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=1)
+        return self._fetch_ccrfcd_qpe_xhr(end_time, delta_hr=1)
 
-    def fetch_ccrfcd_qpe_3hr(self, start_time: datetime) -> np.ndarray: 
+    def fetch_ccrfcd_qpe_3hr(self, end_time: datetime) -> np.ndarray: 
         """
         Returns
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=3)
+        return self._fetch_ccrfcd_qpe_xhr(end_time, delta_hr=3)
 
-    def fetch_ccrfcd_qpe_6hr(self, start_time: datetime) -> np.ndarray: 
+    def fetch_ccrfcd_qpe_6hr(self, end_time: datetime) -> np.ndarray: 
         """
         Returns
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=6)
+        return self._fetch_ccrfcd_qpe_xhr(end_time, delta_hr=6)
 
-    def fetch_ccrfcd_qpe_12hr(self, start_time: datetime) -> np.ndarray: 
+    def fetch_ccrfcd_qpe_12hr(self, end_time: datetime) -> np.ndarray: 
         """
-        Returns
-        ---
-        - An [N, M] array containing cumlative precipitation values (inch)
-        """
-        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=12)
+        **Time Zone: PDT**
+        - Fetch precip accumulation from ``end_time - 12:00`` to ``end_time``
 
-    def fetch_ccrfcd_qpe_24hr(self, start_time: datetime) -> np.ndarray: 
-        """
         Returns
         ---
-        - An [N, M] array containing cumlative precipitation values (inch)
+        - An [N, M] array containing cumlative precipitation values (inches)
         """
-        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=24)
+        return self._fetch_ccrfcd_qpe_xhr(end_time, delta_hr=12)
 
-    def fetch_ccrfcd_qpe_48hr(self, start_time: datetime) -> np.ndarray: 
+    def fetch_ccrfcd_qpe_24hr(self, end_time: datetime) -> np.ndarray: 
         """
         Returns
         ---
         - An [N, M] array containing cumlative precipitation values (inch)
         """
-        return self._fetch_ccrfcd_qpe_xhr(start_time, delta=48)
+        return self._fetch_ccrfcd_qpe_xhr(end_time, delta_hr=24)
+
+    def fetch_ccrfcd_qpe_48hr(self, end_time: datetime) -> np.ndarray: 
+        """
+        Returns
+        ---
+        - An [N, M] array containing cumlative precipitation values (inch)
+        """
+        return self._fetch_ccrfcd_qpe_xhr(end_time, delta_hr=48)
 
 if __name__ == "__main__": 
 
