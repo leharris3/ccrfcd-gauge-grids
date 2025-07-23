@@ -38,7 +38,7 @@ class Location:
         self.lon = lon
 
 
-class CCRFCDGriddedProducts:
+class CCRFCDClient:
 
     _METADATA_FP    = "data/clark-county-rain-gauges/ccrfcd_rain_gauge_metadata.csv"
     _GAUGE_DATA_DIR = "data/clark-county-rain-gauges/2021-"
@@ -64,7 +64,7 @@ class CCRFCDGriddedProducts:
 
     def __init__(self, ):
 
-        self.metadata                            = pd.read_csv(CCRFCDGriddedProducts._METADATA_FP)
+        self.metadata                            = pd.read_csv(CCRFCDClient._METADATA_FP)
         self.valid_station_ids                   = self.metadata[self.metadata['station_id'] > 0]['station_id'].astype(int).tolist()
         self.data_cache: Dict[int, pd.DataFrame] = {}
 

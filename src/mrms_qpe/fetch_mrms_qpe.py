@@ -56,14 +56,14 @@ class MRMSQPEClient:
             raise ValueError(f"Unrecognized mode '{mode}'. "
                              "Choose 'nearest', 'first', or 'next'.")
 
-    def _fetch_radar_only_qpe_x(self, start_time: datetime, product: str, mode="nearest", time_zone="UTC") -> xr.Dataset : 
+    def _fetch_radar_only_qpe_x(self, end_time: datetime, product: str, mode="nearest", time_zone="UTC") -> xr.Dataset : 
         """
         **Timezone**: ``UTC``
         Fetch MRMS ``RadarOnly_QPE`` suite of products. 
 
         Args
         ---
-        :start_time: ``datetime``
+        :start_time: ``end_time``
         :mode: ``str`` 
         - "nearest", "first", or "next"
             - "nearest": find the closest valid file to provide ``datetime``
@@ -76,9 +76,9 @@ class MRMSQPEClient:
 
         # HACK: PDT -> UTC
         if time_zone == "PDT":
-            start_time += timedelta(hours=7)
+            end_time += timedelta(hours=7)
 
-        yyyymmdd = start_time.strftime("%Y%m%d")
+        yyyymmdd = end_time.strftime("%Y%m%d")
         basepath = MRMSPath(
             domain   = MRMSDomain.CONUS, 
             product  = product,
@@ -86,7 +86,7 @@ class MRMSQPEClient:
             )
         
         file_paths   = self.mrms_client.ls(str(basepath))
-        nearest_path = self._get_closest_file(file_paths, start_time)
+        nearest_path = self._get_closest_file(file_paths, end_time)
         
         # TODO: del grib2 files after donwnload
         mp = MRMSPath.from_str(nearest_path)

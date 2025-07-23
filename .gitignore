@@ -1,2 +1,6 @@
-__old____old__
+__old__
 cases-studies
+
+**.grib2
+**.idx
+**.gz
