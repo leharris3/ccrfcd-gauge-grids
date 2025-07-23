@@ -79,25 +79,36 @@ class StatsClient:
         suffix = mrms_product.split("_")[-2]
         if suffix == "15M":
             raise NotImplementedError(f"Error: invalid product: {mrms_product}")
-        elif suffix == "1HR":
+        elif suffix == "01H":
             step         = timedelta(hours=1)
             mrms_fetch_f = self.mrms_client.fetch_radar_only_qpe_1hr
-        elif suffix == "3HR":
+        elif suffix == "03H":
             step         = timedelta(hours=3)
             mrms_fetch_f = self.mrms_client.fetch_radar_only_qpe_3hr
-        elif suffix == "6HR":
+        elif suffix == "6H":
             step         = timedelta(hours=6)
             mrms_fetch_f = self.mrms_client.fetch_radar_only_qpe_6hr
-        elif suffix == "12HR":
+        elif suffix == "12H":
             step         = timedelta(hours=12)
             mrms_fetch_f = self.mrms_client.fetch_radar_only_qpe_12hr
-        elif suffix == "24HR":
+        elif suffix == "24H":
             step         = timedelta(hours=24)
             mrms_fetch_f = self.mrms_client.fetch_radar_only_qpe_24hr
-        elif suffix == "48HR":
+        elif suffix == "48H":
             raise NotImplementedError(f"Error: invalid product: {mrms_product}")
         else: 
             raise NotImplementedError(f"Error: invalid product: {mrms_product}")
+
+        df_dict = {
+            "start_time": [],
+            "end_time": [],
+            "station_id": [],
+            "lat": [],
+            "lon": [],
+            "gauge_qpe": [],
+            "mrms_qpe": [],
+            "delta_qpe": [],
+        }
 
         curr_start_time = start_time
         next_time = start_time + step
@@ -112,12 +123,28 @@ class StatsClient:
 
             deltas = self._get_gauge_mrms_deltas(gauge_qpes, mrms_qpe_xarr)
 
-            breakpoint()
+            for item in deltas:
+
+                df_dict['start_time'].append(str(curr_start_time))
+                df_dict['end_time'].append(str(next_time))
+                df_dict['station_id'].append(item['station_id'])
+                df_dict['lat'].append(float(item['lat']))
+                df_dict['lon'].append(float(item['lon']))
+                df_dict['gauge_qpe'].append(float(item['gauge_qpe']))
+                df_dict['mrms_qpe'].append(float(item['mrms_qpe']))
+                df_dict['delta_qpe'].append(float(item['delta_qpe']))
 
             curr_start_time += step
             next_time       += step
 
+        return pd.DataFrame(df_dict)
+
 
 if __name__ == "__main__":
+
     sc = StatsClient()
-    
+    t0 = datetime(year=2023, month=8, day=21, hour=2)
+    t1 = datetime(year=2023, month=8, day=21, hour=10)
+    df = sc.fetch_stats_for_range(t0, t1, MRMSProductsEnum.RadarOnly_QPE_01H)
+    breakpoint()
+

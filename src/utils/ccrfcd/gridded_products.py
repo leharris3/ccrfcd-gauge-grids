@@ -20,15 +20,14 @@ queries:
 """
 
 import logging
-from logging.config import DictConfigurator
 import numpy as np
 import pandas as pd
 
-from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
-from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
 
 
 class Location:
@@ -52,15 +51,6 @@ class CCRFCDClient:
     # 0.1° ~ 10 km?
     # _DLAT = _DLON = 0.045
     _DLAT = _DLON = 0.02
-
-    # # clark county
-    # _LAT_MIN = 36.0
-    # _LAT_MAX = 36.5
-    # _LON_MIN = -115.2
-    # _LON_MAX = -114.7
-
-    # # 0.01° ~ 1km
-    # _DLAT = _DLON = 0.01
 
     def __init__(self, ):
 
@@ -97,9 +87,26 @@ class CCRFCDClient:
         if df is None:
             return (None, None)
 
-        # HACK: df is sorted present -> past, delta values are negative
+        # one issue is that rain gauges occasionally reset (e.g., 3.0" -> 0.0")
+        # these resets (and descending values, generally should be ignored)
         if 'delta' not in df.columns:
-            df['delta'] = df['Value'].diff().fillna(0) * -1  # invert sign once
+
+            delta_arr   = []
+            values = list(df["Value"])
+
+            for i, val in enumerate(values): 
+
+                if i >= len(values) - 1: break
+                curr_val = val
+                prev_val = values[i + 1]
+                delta    = curr_val - prev_val
+
+                # handle gauge resets; negative values
+                delta    = max(delta, 0.0)
+                delta_arr.append(delta)
+
+            delta_arr   = [0.0] + delta_arr
+            df['delta'] = delta_arr
 
         # cumulative precip
         cum_precip = None
@@ -110,48 +117,9 @@ class CCRFCDClient:
         row          = location_row.iloc[0]
         location     = Location(lat=float(row.lat), lon=float(row.lon))
 
-        # # find `start_time` and `end_time` rows
-        # # date/time columns are sorted
-        # closest_start_time  = None
-        # closest_start_idx   = None
-        # closest_end_time    = None
-        # closest_end_idx     = None
-
-        # O(N)
-        # for idx, row in enumerate(df.iterrows()):
-
-        #     _date         = row[1].Date
-        #     _time         = row[1].Time
-        #     _datetime_str = f"{_date} {_time}"
-        #     _datetime     = datetime.strptime(_datetime_str, '%m/%d/%Y %H:%M:%S')
-
-        #     # find the closest `_datetime` to `start_time`
-        #     if closest_start_time == None:
-        #         closest_start_time  = _datetime
-        #         closest_start_idx   = idx 
-        #     else:
-        #         if abs(start_time - _datetime) < abs(start_time - closest_start_time):
-        #             closest_start_time  = _datetime
-        #             closest_start_idx   = idx
-
-        #     # find the closest `_datetime` to `end_time`
-        #     if closest_end_time == None:
-        #         closest_end_time  = _datetime
-        #         closest_end_idx   = idx
-        #     else:
-        #         if abs(end_time - _datetime) < abs(end_time - closest_end_time):
-        #             closest_end_time  = _datetime
-        #             closest_end_idx   = idx
-
-        # sum delta_precip to get the total precip over a window of time
-        # if closest_start_time != closest_end_time:
-        #     cum_precip = df[closest_end_idx: closest_start_idx]['delta'].sum()
-        
-        # return (location, cum_precip)
-
         # get [start, end] bounds
-        start_idx = df.index.get_indexer([start_time], method='nearest')[0]
-        end_idx   = df.index.get_indexer([end_time],   method='nearest')[0]
+        start_idx  = df.index.get_indexer([start_time], method='nearest')[0]
+        end_idx    = df.index.get_indexer([end_time],   method='nearest')[0]
         cum_precip = df.iloc[end_idx:start_idx+1]['delta'].sum()
 
         return location, float(cum_precip)
@@ -194,8 +162,9 @@ class CCRFCDClient:
 
         return grid_mean
 
-    def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime) -> List[Dict]:
+    def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime, timezone="UTC") -> List[Dict]:
         """
+        **Time Zone: UTC**
         Gather all cummulative precipitation values (in.) between bounds of [start_time, end_time]; inclusive.
 
         Returns
@@ -208,6 +177,11 @@ class CCRFCDClient:
         }]
         ```
         """
+
+        # UTC -> PDT
+        if timezone == "UTC":
+            start_time -= timedelta(hours=7)
+            end_time   -= timedelta(hours=7)
         
         all_gauge_qpe = []
 
@@ -300,5 +274,5 @@ if __name__ == "__main__":
 
     t1 = datetime(year=2024, month=7, day=14, hour=6)
     t2 = datetime(year=2024, month=7, day=14, hour=12)
-    obj = CCRFCDGriddedProducts()
+    obj = CCRFCDClient()
     gauge_qpes = obj.fetch_ccrfcd_qpe_1hr(t1)
