@@ -1,6 +1,7 @@
 import os
 import xarray as xr
 
+from glob import glob
 from typing import List
 from datetime import datetime, timedelta
 from bisect import bisect_left, bisect_right
@@ -56,7 +57,15 @@ class MRMSQPEClient:
             raise ValueError(f"Unrecognized mode '{mode}'. "
                              "Choose 'nearest', 'first', or 'next'.")
 
-    def _fetch_radar_only_qpe_x(self, end_time: datetime, product: str, mode="nearest", time_zone="UTC") -> xr.Dataset : 
+    def _fetch_radar_only_qpe_x(
+            self, 
+            end_time: datetime, 
+            product: str, 
+            mode="nearest", 
+            time_zone="UTC", 
+            to_dir="__temp",
+            del_tmp_files=False,
+        ) -> xr.Dataset:
         """
         **Timezone**: ``UTC``
         Fetch MRMS ``RadarOnly_QPE`` suite of products. 
@@ -88,13 +97,18 @@ class MRMSQPEClient:
         file_paths   = self.mrms_client.ls(str(basepath))
         nearest_path = self._get_closest_file(file_paths, end_time)
         
-        # TODO: del grib2 files after donwnload
+        # TODO: del grib2 files after download
         mp = MRMSPath.from_str(nearest_path)
-        fp = self.mrms_client.download(str(mp), to="")
+        fp = self.mrms_client.download(str(mp), to=to_dir)
         
         zipped_gf = ZippedGrib2File(fp)
-        gf        = zipped_gf.unzip(to_dir="")
+        gf        = zipped_gf.unzip(to_dir=to_dir)
         xa        = gf.to_xarray()
+
+        if del_tmp_files == True:
+            tmp_fps = glob(f"{to_dir}/**")
+            for fp in tmp_fps:
+                os.remove(fp)
 
         return xa
 

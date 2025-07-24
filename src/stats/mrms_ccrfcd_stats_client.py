@@ -1,12 +1,21 @@
 import xarray
+import warnings
 import numpy as np
 import pandas as pd
 
+from tqdm import tqdm
 from typing import List
 from datetime import datetime, timedelta
 from src.utils.mrms.products import MRMSProductsEnum
 from src.utils.ccrfcd.gridded_products import CCRFCDClient
 from src.mrms_qpe.fetch_mrms_qpe import MRMSQPEClient
+
+
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message=".*decode_timedelta will default to False.*"
+)
 
 
 class StatsClient:
@@ -68,7 +77,8 @@ class StatsClient:
             start_time: datetime, 
             end_time: datetime, 
             mrms_product: MRMSProductsEnum, 
-            timezone: str = "UTC"
+            timezone: str = "UTC",
+            timedelta_interval: timedelta = None,
         ) -> pd.DataFrame: 
         """
         **Timezone**: ``UTC``
@@ -98,6 +108,9 @@ class StatsClient:
             raise NotImplementedError(f"Error: invalid product: {mrms_product}")
         else: 
             raise NotImplementedError(f"Error: invalid product: {mrms_product}")
+        
+        if timedelta_interval != None:
+            step = timedelta_interval
 
         df_dict = {
             "start_time": [],
@@ -110,32 +123,39 @@ class StatsClient:
             "delta_qpe": [],
         }
 
+        total_steps = (end_time - start_time) // step
         curr_start_time = start_time
         next_time = start_time + step
 
-        while next_time <= end_time:
+        with tqdm(total=total_steps, desc="Fetching stats...") as pbar:
 
-            # grab rain-gauge qpe
-            gauge_qpes    = self.ccrfcd_client._fetch_all_gauge_qpe(curr_start_time, next_time)
-            
-            # grab mrms qpe
-            mrms_qpe_xarr = mrms_fetch_f(next_time, time_zone=timezone)
+            while next_time <= end_time:
 
-            deltas = self._get_gauge_mrms_deltas(gauge_qpes, mrms_qpe_xarr)
+                # HACK
+                next_time_ccrfcd = curr_start_time + timedelta(hours=1)
 
-            for item in deltas:
+                # grab rain-gauge qpe
+                gauge_qpes    = self.ccrfcd_client._fetch_all_gauge_qpe(curr_start_time, next_time_ccrfcd, disable_tqdm=True)
+                
+                # grab mrms qpe
+                mrms_qpe_xarr = mrms_fetch_f(next_time, time_zone=timezone)
 
-                df_dict['start_time'].append(str(curr_start_time))
-                df_dict['end_time'].append(str(next_time))
-                df_dict['station_id'].append(item['station_id'])
-                df_dict['lat'].append(float(item['lat']))
-                df_dict['lon'].append(float(item['lon']))
-                df_dict['gauge_qpe'].append(float(item['gauge_qpe']))
-                df_dict['mrms_qpe'].append(float(item['mrms_qpe']))
-                df_dict['delta_qpe'].append(float(item['delta_qpe']))
+                deltas = self._get_gauge_mrms_deltas(gauge_qpes, mrms_qpe_xarr)
 
-            curr_start_time += step
-            next_time       += step
+                for item in deltas:
+
+                    df_dict['start_time'].append(str(curr_start_time))
+                    df_dict['end_time'].append(str(next_time))
+                    df_dict['station_id'].append(item['station_id'])
+                    df_dict['lat'].append(float(item['lat']))
+                    df_dict['lon'].append(float(item['lon']))
+                    df_dict['gauge_qpe'].append(float(item['gauge_qpe']))
+                    df_dict['mrms_qpe'].append(float(item['mrms_qpe']))
+                    df_dict['delta_qpe'].append(float(item['delta_qpe']))
+
+                curr_start_time += step
+                next_time       += step
+                pbar.update()
 
         return pd.DataFrame(df_dict)
 
@@ -145,6 +165,6 @@ if __name__ == "__main__":
     sc = StatsClient()
     t0 = datetime(year=2023, month=8, day=21, hour=2)
     t1 = datetime(year=2023, month=8, day=21, hour=10)
-    df = sc.fetch_stats_for_range(t0, t1, MRMSProductsEnum.RadarOnly_QPE_01H)
+    df = sc.fetch_stats_for_range(t0, t1, MRMSProductsEnum.RadarOnly_QPE_01H, timedelta_interval=timedelta(minutes=2))
     breakpoint()
 

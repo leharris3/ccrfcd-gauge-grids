@@ -40,7 +40,7 @@ class Location:
 class CCRFCDClient:
 
     _METADATA_FP    = "data/clark-county-rain-gauges/ccrfcd_rain_gauge_metadata.csv"
-    _GAUGE_DATA_DIR = "data/clark-county-rain-gauges/2021-"
+    _GAUGE_DATA_DIR = "data/7-23-25-scrape"
 
     # state of nevada
     _LAT_MIN = 34.751857
@@ -105,7 +105,7 @@ class CCRFCDClient:
                 delta    = max(delta, 0.0)
                 delta_arr.append(delta)
 
-            delta_arr   = [0.0] + delta_arr
+            delta_arr   = delta_arr + [0.0]
             df['delta'] = delta_arr
 
         # cumulative precip
@@ -118,11 +118,59 @@ class CCRFCDClient:
         location     = Location(lat=float(row.lat), lon=float(row.lon))
 
         # get [start, end] bounds
-        start_idx  = df.index.get_indexer([start_time], method='nearest')[0]
-        end_idx    = df.index.get_indexer([end_time],   method='nearest')[0]
-        cum_precip = df.iloc[end_idx:start_idx+1]['delta'].sum()
+        # TODO: fix, we should just index between start and end times
+        # start_idx  = df.index.get_indexer([start_time], method='nearest')[0]
+        # end_idx    = df.index.get_indexer([end_time],   method='nearest')[0]
+        # cum_precip = df.iloc[end_idx:start_idx+1]['delta'].sum()
 
+        cum_precip = df.loc[end_time:start_time]['delta'].sum()
         return location, float(cum_precip)
+
+    def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime, timezone="UTC", disable_tqdm=False) -> List[Dict]:
+        """
+        **Time Zone: UTC**
+        Gather all cummulative precipitation values (in.) between bounds of [start_time, end_time]; inclusive.
+
+        Returns
+        ---
+        ```python
+        [{
+            "station_id": int,
+            "location": Location,
+            "qpe": float
+        }]
+        ```
+        """
+
+        # UTC -> PDT
+        if timezone == "UTC":
+            start_time -= timedelta(hours=7)
+            end_time   -= timedelta(hours=7)
+        
+        all_gauge_qpe = []
+
+        for _id in tqdm(self.valid_station_ids, total=len(self.valid_station_ids), disable=disable_tqdm):
+
+            try:
+                res: Tuple[Optional[Location], Optional[float]] = self._fetch_gauge_qpe(_id, start_time, end_time)
+            except Exception as e:
+                # HACK: silencing these errors for now
+                # print(e)
+                # print(f"Error fetching gauge id: {_id}")
+                continue
+
+            # remove invalid results
+            # TODO: clarify this >>
+            if res[0] == None or res[1] == None: continue
+            
+            all_gauge_qpe.append({
+                "station_id": _id,
+                "lat": res[0].lat,
+                "lon": res[0].lon + 360,
+                "qpe": res[1],
+            })
+
+        return all_gauge_qpe
 
     def _grid_all_gauge_qpe(self, gauge_qpes: List[Tuple[Location, float]]) -> List[List[float]]: 
         """
@@ -161,51 +209,6 @@ class CCRFCDClient:
             grid_mean = grid_sum / grid_cnt
 
         return grid_mean
-
-    def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime, timezone="UTC") -> List[Dict]:
-        """
-        **Time Zone: UTC**
-        Gather all cummulative precipitation values (in.) between bounds of [start_time, end_time]; inclusive.
-
-        Returns
-        ---
-        ```python
-        [{
-            "station_id": int,
-            "location": Location,
-            "qpe": float
-        }]
-        ```
-        """
-
-        # UTC -> PDT
-        if timezone == "UTC":
-            start_time -= timedelta(hours=7)
-            end_time   -= timedelta(hours=7)
-        
-        all_gauge_qpe = []
-
-        for _id in tqdm(self.valid_station_ids, total=len(self.valid_station_ids)):
-
-            try:
-                res: Tuple[Optional[Location], Optional[float]] = self._fetch_gauge_qpe(_id, start_time, end_time)
-            except Exception as e:
-                print(e)
-                print(f"Error fetching gauge id: {_id}")
-                continue
-
-            # remove invalid results
-            # TODO: clarify this >>
-            if res[0] == None or res[1] == None: continue
-            
-            all_gauge_qpe.append({
-                "station_id": _id,
-                "lat": res[0].lat,
-                "lon": res[0].lon + 360,
-                "qpe": res[1],
-            })
-
-        return all_gauge_qpe
 
     def _fetch_ccrfcd_qpe_xhr(self, end_time: datetime, delta_hr: int = 0, delta_min: int = 0) -> List[Dict]:
         """

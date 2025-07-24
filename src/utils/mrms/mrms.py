@@ -222,6 +222,7 @@ class MRMSAWSS3Client:
                 f"Download failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
             )
 
+        # TODO: clarify; wtf is this
         if len(local_paths) == 1:
             return local_paths[0]
         
