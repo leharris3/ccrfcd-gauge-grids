@@ -65,7 +65,7 @@ class MRMSQPEClient:
             time_zone="UTC", 
             to_dir="__temp",
             del_tmp_files=False,
-        ) -> xr.Dataset:
+        ) -> xr.Dataset | None:
         """
         **Timezone**: ``UTC``
         Fetch MRMS ``RadarOnly_QPE`` suite of products. 
@@ -94,7 +94,12 @@ class MRMSQPEClient:
             yyyymmdd = yyyymmdd
             )
         
-        file_paths   = self.mrms_client.ls(str(basepath))
+        try:
+            file_paths   = self.mrms_client.ls(str(basepath))
+        except:
+            print(f"Error: no MRMS file @{str(basepath)}")
+            return None
+
         nearest_path = self._get_closest_file(file_paths, end_time)
         
         # TODO: del grib2 files after download
@@ -147,12 +152,12 @@ class MRMSQPEClient:
         """
         return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_12H, mode=mode, time_zone=time_zone)
     
-    def fetch_radar_only_qpe_24hr(self, start_time: datetime, mode="nearest", time_zone="UTC"):
+    def fetch_radar_only_qpe_24hr(self, end_time: datetime, mode="nearest", time_zone="UTC"):
         """
         **Time Zone**: ``UTC``
         - Fetch ``end_time-24:00``-``end_time``
         """
-        return self._fetch_radar_only_qpe_x(start_time, MRMSProductsEnum.RadarOnly_QPE_24H, mode=mode, time_zone=time_zone)
+        return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_24H, mode=mode, time_zone=time_zone)
 
 
 if __name__ == "__main__":

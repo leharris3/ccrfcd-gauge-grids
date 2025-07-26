@@ -7,7 +7,7 @@ from tqdm import tqdm
 from typing import List
 from datetime import datetime, timedelta
 from src.utils.mrms.products import MRMSProductsEnum
-from src.utils.ccrfcd.gridded_products import CCRFCDClient
+from src.utils.ccrfcd.ccrfcd_client import CCRFCDClient
 from src.mrms_qpe.fetch_mrms_qpe import MRMSQPEClient
 
 

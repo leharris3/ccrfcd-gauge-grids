@@ -3,10 +3,18 @@
 
 ## Backend
 
-- [ ] 1. Functionality to update database of rain-gauge data to present
+- [x] 1. Functionality to update database of rain-gauge data to present
 
 ## Middleware/Logic
 
+- [ ] 1. 
+
 ## Frontend
 
-- [ ] 1. Side-by-side MRMS-QPE/CCRFCD with identical y-axis
+- [x] 1. Side-by-side MRMS-QPE/CCRFCD with identical y-axis
+
+## Data Collection
+
+- [ ] 1. 2021-2025 (late may.-early sep.) days 24HR MRMS QPE exceeded .25 in. at any point in the las vegas valley
+- [ ] 2. Delta-QPE for all days in `1.`
+- [ ] 3. Eviornmental parameters (0Z + 12Z soundings) for all days in `1.`
