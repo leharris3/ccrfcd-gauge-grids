@@ -1,4 +1,4 @@
-# CCRFCD Rain-Gauge & MRMS QPE Alignment
+# **CCRFCD Rain-Gauge & MRMS QPE Alignment**
 ---
 
 ## Backend
@@ -7,7 +7,7 @@
 
 ## Middleware/Logic
 
-- [ ] 1. 
+- [ ] 1. ...
 
 ## Frontend
 
@@ -15,6 +15,11 @@
 
 ## Data Collection
 
-- [ ] 1. 2021-2025 (late may.-early sep.) days 24HR MRMS QPE exceeded .25 in. at any point in the las vegas valley
-- [ ] 2. Delta-QPE for all days in `1.`
+- [x] 1. 2021-2025 (late may.-early sep.) days 24HR MRMS QPE exceeded .25 in. at any point in the las vegas valley
+- [x] 2. Delta-QPE for all days in `1.`
 - [ ] 3. Eviornmental parameters (0Z + 12Z soundings) for all days in `1.`
+
+## Visualization & Analysis
+
+- [ ] 1. Histogram of dates/max-qpe of data sources
+- [ ] 2. ...

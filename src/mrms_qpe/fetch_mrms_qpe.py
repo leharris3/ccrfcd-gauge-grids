@@ -1,15 +1,40 @@
 import os
+import warnings
 import xarray as xr
 
 from glob import glob
 from typing import List
 from datetime import datetime, timedelta
 from bisect import bisect_left, bisect_right
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from src.utils.mrms.files import ZippedGrib2File, Grib2File
 from src.utils.mrms.mrms import MRMSDomain, MRMSPath
 from src.utils.mrms.mrms import MRMSAWSS3Client
 from src.utils.mrms.products import MRMSProductsEnum
+
+
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message=".*decode_timedelta will default to False.*"
+)
+
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*pyproj unable to set PROJ database path.*"
+)
+
+
+def _process_single_file(fp: str, to_dir: str) -> xr.Dataset:
+            
+    # HACK:...
+    _fp = glob(f"{to_dir}/*{os.path.basename(fp)}")[0]
+    zipped_gf = ZippedGrib2File(_fp)
+    gf        = zipped_gf.unzip(to_dir=to_dir)
+    xa        = gf.to_xarray()
+    return xa
 
 
 class MRMSQPEClient:
@@ -116,6 +141,70 @@ class MRMSQPEClient:
                 os.remove(fp)
 
         return xa
+    
+    def _fetch_radar_only_qpe_x_batch(
+            self, 
+            end_time: datetime, 
+            product: str, 
+            mode="nearest", 
+            time_zone="UTC", 
+            to_dir="__temp",
+            del_tmp_files=False,
+        ) -> List[xr.Dataset | None]:
+        """
+        **Timezone**: ``UTC``
+        Fetch MRMS ``RadarOnly_QPE`` suite of products. 
+
+        Args
+        ---
+        :start_time: ``end_time``
+        :mode: ``str`` 
+        - "nearest", "first", or "next"
+            - "nearest": find the closest valid file to provide ``datetime``
+            - "first"  : closest valid file whos time < start_time
+            - "next"   : closest valid file whos time > start_time
+
+        Returns
+        ---
+        """
+
+        # HACK: PDT -> UTC
+        if time_zone == "PDT":
+            end_time += timedelta(hours=7)
+
+        yyyymmdd = end_time.strftime("%Y%m%d")
+        basepath = MRMSPath(
+            domain   = MRMSDomain.CONUS, 
+            product  = product,
+            yyyymmdd = yyyymmdd
+            )
+        
+        try:
+            file_paths   = self.mrms_client.ls(str(basepath))
+        except:
+            print(f"Error: no MRMS file @{str(basepath)}")
+            return None
+
+        basepath_str = str(basepath)
+        if not basepath_str.endswith("/"):
+            basepath_str += "/"
+
+        fps = self.mrms_client.download(basepath_str, to=to_dir, recursive=True)
+        
+        xas = []
+        with ProcessPoolExecutor() as executor:
+            futures = {executor.submit(_process_single_file, fp, to_dir): fp for fp in fps}
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    xas.append(result)
+
+        if del_tmp_files == True:
+            tmp_fps = glob(f"{to_dir}/**")
+            for fp in tmp_fps:
+                os.remove(fp)
+
+        return xas
 
     def fetch_radar_only_qpe_15m(self, end_time: datetime, mode="nearest", time_zone="UTC"):
         """
@@ -158,10 +247,17 @@ class MRMSQPEClient:
         - Fetch ``end_time-24:00``-``end_time``
         """
         return self._fetch_radar_only_qpe_x(end_time, MRMSProductsEnum.RadarOnly_QPE_24H, mode=mode, time_zone=time_zone)
+    
+    def fetch_radar_only_qpe_full_day_1hr(self, end_time: datetime, mode="nearest", time_zone="UTC", del_tmps=False) -> List[xr.Dataset]:
+        """
+        **Time Zone**: ``UTC``
+        - Fetch ``end_time-24:00``-``end_time``
+        """
+        return self._fetch_radar_only_qpe_x_batch(end_time, MRMSProductsEnum.RadarOnly_QPE_01H, mode=mode, time_zone=time_zone, del_tmp_files=del_tmps)
 
 
 if __name__ == "__main__":
     client = MRMSQPEClient()
     date = datetime.now()
-    ar = client.fetch_radar_only_qpe_6hr(date)
+    ar = client.fetch_radar_only_qpe_full_day_1hr(date, del_tmps=True)
     breakpoint()

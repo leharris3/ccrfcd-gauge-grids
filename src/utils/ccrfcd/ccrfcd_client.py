@@ -27,7 +27,7 @@ from tqdm import tqdm
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 
 class Location:
@@ -74,7 +74,11 @@ class CCRFCDClient:
 
         return df
 
-    def _fetch_gauge_qpe(self, gauge_id: int, start_time: datetime, end_time: datetime) -> Tuple[Location, float]:
+    def _fetch_gauge_qpe(self, 
+                         gauge_id: int, 
+                         start_time: datetime, 
+                         end_time: datetime
+                         ) -> Tuple[Location, float, int]:
         """
         Returns
         --- 
@@ -85,7 +89,7 @@ class CCRFCDClient:
 
         df = self._get_gauge_df(gauge_id)
         if df is None:
-            return (None, None)
+            return (None, None, None)
 
         # one issue is that rain gauges occasionally reset (e.g., 3.0" -> 0.0")
         # these resets (and descending values, generally should be ignored)
@@ -124,7 +128,7 @@ class CCRFCDClient:
         # cum_precip = df.iloc[end_idx:start_idx+1]['delta'].sum()
 
         cum_precip = df.loc[end_time:start_time]['delta'].sum()
-        return location, float(cum_precip)
+        return location, float(cum_precip), gauge_id
 
     def _fetch_all_gauge_qpe(self, start_time: datetime, end_time: datetime, timezone="UTC", disable_tqdm=False) -> List[Dict]:
         """
@@ -148,27 +152,46 @@ class CCRFCDClient:
             end_time   -= timedelta(hours=7)
         
         all_gauge_qpe = []
-
-        for _id in tqdm(self.valid_station_ids, total=len(self.valid_station_ids), disable=disable_tqdm):
-
-            try:
-                res: Tuple[Optional[Location], Optional[float]] = self._fetch_gauge_qpe(_id, start_time, end_time)
-            except Exception as e:
-                # HACK: silencing these errors for now
-                # print(e)
-                # print(f"Error fetching gauge id: {_id}")
-                continue
-
-            # remove invalid results
-            # TODO: clarify this >>
-            if res[0] == None or res[1] == None: continue
+        
+        with ThreadPoolExecutor() as executor:
             
-            all_gauge_qpe.append({
-                "station_id": _id,
-                "lat": res[0].lat,
-                "lon": res[0].lon + 360,
-                "qpe": res[1],
-            })
+            futures = {executor.submit(self._fetch_gauge_qpe, _id, start_time, end_time): _id for _id in self.valid_station_ids}
+            for future in as_completed(futures):
+                try:
+                    res: Tuple[Optional[Location], Optional[float], Optional[int]] = future.result()
+                    if res[0] is None: continue
+                    all_gauge_qpe.append({
+                        "station_id": res[2],
+                        "lat": res[0].lat,
+                        "lon": res[0].lon + 360,
+                        "qpe": res[1],
+                    })
+                except Exception as e:
+                    # HACK: silencing these errors for now
+                    # print(e)
+                    # print(f"Error fetching gauge id: ???")
+                    pass
+            
+        # for _id in tqdm(self.valid_station_ids, total=len(self.valid_station_ids), disable=disable_tqdm):
+
+        #     try:
+        #         res: Tuple[Optional[Location], Optional[float]] = self._fetch_gauge_qpe(_id, start_time, end_time)
+        #     except Exception as e:
+        #         # HACK: silencing these errors for now
+        #         # print(e)
+        #         # print(f"Error fetching gauge id: {_id}")
+        #         continue
+
+        #     # remove invalid results
+        #     # TODO: clarify this >>
+        #     if res[0] == None or res[1] == None: continue
+            
+        #     all_gauge_qpe.append({
+        #         "station_id": _id,
+        #         "lat": res[0].lat,
+        #         "lon": res[0].lon + 360,
+        #         "qpe": res[1],
+        #     })
 
         return all_gauge_qpe
 
