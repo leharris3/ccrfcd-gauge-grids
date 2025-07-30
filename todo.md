@@ -26,3 +26,8 @@
 
 - [ ] 1. Histogram of dates/max-qpe of data sources
 - [ ] 2. ...
+
+## Post-Processing/Data Cleaning
+
+- [ ] 1. Remove bad gauges
+- [ ] 2. Remove enormous delta_qpe spikes (e.g., 2.5 in.+)
