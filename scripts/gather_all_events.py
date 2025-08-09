@@ -23,6 +23,8 @@ JUNE_DAYS = [25, 26, 27, 28, 29, 30, 31]
 SEP_DAYS = [1, 2, 3, 4, 5, 6, 7]
 
 MIN_PRECIP_THRESH = 0.25
+
+# lat/lon coords of the Las Vegas valley region
 LAT_MIN = 35.8
 LAT_MAX = 36.4
 LON_MIN = -115.4
